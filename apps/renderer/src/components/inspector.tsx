@@ -73,7 +73,7 @@ function NodeInspector({ node }: { node: CanvasNode }) {
     const model = models.find((item) => item.id === modelId)!;
     patchNode(node.id, (current) => current.kind !== 'group' ? {
       ...current,
-      config: { ...current.config, model: { modelId, endpointId: model.endpoints[0]?.id, params: defaultsFor(model.endpoints[0]) } },
+      config: { ...current.config, model: { modelId, params: defaultsFor(model.endpoints[0]) } },
       updatedAt: new Date().toISOString(),
     } as CanvasNode : current);
   };
@@ -105,7 +105,10 @@ function NodeInspector({ node }: { node: CanvasNode }) {
         <Select value={selectedModel?.id} onValueChange={changeModel}><SelectTrigger><SelectValue placeholder="选择模型" /></SelectTrigger><SelectContent>{availableModels.map((model) => <SelectItem key={model.id} value={model.id}>{model.displayName}</SelectItem>)}</SelectContent></Select>
         {node.config.model?.modelId && !selectedModel ? <p className="flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-2 text-[11px] text-amber-800 dark:border-amber-900 dark:bg-amber-950/55 dark:text-amber-200"><AlertCircle className="h-3.5 w-3.5 shrink-0" />原模型配置已删除或与当前节点不再兼容，请重新选择。</p> : null}
         {!availableModels.length ? <p className="text-[11px] leading-5 text-muted-foreground">暂无与该节点兼容的已配置模型，请先在应用设置中添加。</p> : null}
-        {selectedModel ? <p className="text-[11px] leading-5 text-muted-foreground">{selectedModel.description}</p> : null}
+        {selectedModel ? <div className="flex items-start gap-2.5 rounded-lg border border-border/70 bg-muted/30 p-2.5">
+          {selectedModel.providerLogoPath ? <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-md border border-border bg-background p-1.5"><img src={selectedModel.providerLogoPath} alt="" className="h-full w-full object-contain dark:invert" /></div> : null}
+          <div className="min-w-0"><div className="text-[10px] font-semibold uppercase tracking-[.12em] text-muted-foreground">{selectedModel.providerName ?? selectedModel.providerId}</div><p className="mt-1 text-[11px] leading-5 text-muted-foreground">{selectedModel.description}</p></div>
+        </div> : null}
         {selectedModel && selectedModel.endpoints.length > 1 ? <><Label>生成模式</Label><Select value={selectedEndpoint?.id} onValueChange={changeEndpoint}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{selectedModel.endpoints.map((endpoint) => <SelectItem key={endpoint.id} value={endpoint.id}>{endpoint.displayName}</SelectItem>)}</SelectContent></Select></> : null}
       </section>
       {selectedEndpoint?.params.length ? <section className="grid grid-cols-2 gap-3">{selectedEndpoint.params.map((field) => <ParamControl key={field.key} field={field} value={node.config.model?.params[field.key] ?? field.defaultValue} onChange={(value) => changeParam(field.key, value)} />)}</section> : null}

@@ -100,17 +100,21 @@ export function SettingsDialog({ collapsed = false }: { collapsed?: boolean }) {
           </div>
         </TabsContent>
         <TabsContent value="providers" className="max-h-[64vh] space-y-5 overflow-y-auto pr-1">
-          <ModelConfigurationPanel />
-          <Separator />
-          <div><h3 className="text-sm font-semibold">内置模型服务</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">为应用内置的 OpenAI 与通义万相适配器配置凭据；保存后其模型才会出现在节点列表中。</p></div>
+          <div><h3 className="text-sm font-semibold">内置模型服务</h3><p className="mt-1 text-xs leading-5 text-muted-foreground">只需保存厂商 API Key，该厂商的图片与视频模型会立即出现在画布节点中。密钥只保存在本机加密凭据库。</p></div>
           {providers.map((provider) => <div key={provider.id} className="rounded-xl border border-border bg-muted/25 p-4">
             <div className="flex items-start justify-between gap-3">
-              <div><div className="flex items-center gap-2 text-sm font-semibold">{provider.displayName}{provider.configured ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/55 dark:text-emerald-300"><Check className="mr-1 h-3 w-3" />已就绪</Badge> : <Badge>未配置</Badge>}</div><div className="mt-1 text-[11px] text-muted-foreground">{provider.requiresCredential ? `加密后端：${provider.backend}${provider.secure ? '' : '（预览/弱后端）'}` : '无需凭据 · 完全离线'}</div></div>
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center overflow-hidden rounded-xl border border-border bg-background p-2">{provider.logoPath ? <img src={provider.logoPath} alt="" className="h-full w-full object-contain dark:invert" /> : <Sparkles className="h-4 w-4" />}</div>
+                <div className="min-w-0"><div className="flex flex-wrap items-center gap-2 text-sm font-semibold">{provider.displayName}{provider.configured ? <Badge className="border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/55 dark:text-emerald-300"><Check className="mr-1 h-3 w-3" />已就绪</Badge> : <Badge>未配置</Badge>}<Badge>{provider.modelCount ?? 0} 个模型</Badge></div><p className="mt-1 text-[11px] leading-5 text-muted-foreground">{provider.description}</p><div className="mt-1 text-[10px] text-muted-foreground">{provider.requiresCredential ? `加密后端：${provider.backend}${provider.secure ? '' : '（预览/弱后端）'}` : '无需凭据 · 完全离线'}</div></div>
+              </div>
               {provider.configured && provider.requiresCredential ? <Button variant="ghost" size="icon" className="h-8 w-8 text-muted-foreground hover:text-red-600" onClick={() => void remove(provider.id)} disabled={busy === provider.id}><Trash2 className="h-4 w-4" /></Button> : null}
             </div>
-            {provider.requiresCredential ? <div className="mt-3 flex gap-2"><Input type="password" autoComplete="off" value={secrets[provider.id] ?? ''} onChange={(event) => setSecrets((current) => ({ ...current, [provider.id]: event.target.value }))} placeholder={provider.configured ? '已配置 · 输入新值可覆盖' : '粘贴 API Key'} /><Button onClick={() => void save(provider.id)} disabled={!secrets[provider.id]?.trim() || busy === provider.id}>{busy === provider.id ? <Loader2 className="h-4 w-4 animate-spin" /> : '保存'}</Button>{provider.configured ? <Button variant="outline" onClick={() => void test(provider.id)} disabled={busy === provider.id}>测试</Button> : null}</div> : null}
+            {provider.modelNames?.length ? <div className="mt-3 flex flex-wrap gap-1.5">{provider.modelNames.map((name) => <span key={name} className="rounded-md border border-border/70 bg-background/65 px-2 py-1 text-[10px] text-muted-foreground">{name}</span>)}</div> : null}
+            {provider.requiresCredential ? <div className="mt-3 flex gap-2"><Input type="password" autoComplete="off" value={secrets[provider.id] ?? ''} onChange={(event) => setSecrets((current) => ({ ...current, [provider.id]: event.target.value }))} placeholder={provider.configured ? '已配置 · 输入新值可覆盖' : provider.credentialPlaceholder ?? '粘贴 API Key'} /><Button onClick={() => void save(provider.id)} disabled={!secrets[provider.id]?.trim() || busy === provider.id}>{busy === provider.id ? <Loader2 className="h-4 w-4 animate-spin" /> : '保存'}</Button>{provider.configured ? <Button variant="outline" onClick={() => void test(provider.id)} disabled={busy === provider.id}>测试</Button> : null}</div> : null}
             {result[provider.id] ? <p className="mt-2 text-[11px] text-muted-foreground">{result[provider.id]}</p> : provider.lastTest ? <p className="mt-2 text-[11px] text-muted-foreground">上次测试：{provider.lastTest.message}</p> : null}
           </div>)}
+          <Separator />
+          <ModelConfigurationPanel />
         </TabsContent>
         <TabsContent value="data">
           <div className="grid gap-3 sm:grid-cols-2">

@@ -252,6 +252,8 @@ export type ParamField = z.infer<typeof ParamFieldSchema>;
 export const PublicModelSchema = z.object({
   id: z.string(),
   providerId: z.string(),
+  providerName: z.string().optional(),
+  providerLogoPath: z.string().optional(),
   displayName: z.string(),
   kind: z.enum(['image', 'video']),
   modelType: z.enum(['language', 'vision', 'multimodal', 'speech']),
@@ -305,6 +307,12 @@ export type SaveModelConfigurationInput = z.infer<typeof SaveModelConfigurationI
 export const ProviderStateSchema = z.object({
   id: z.string(),
   displayName: z.string(),
+  description: z.string().optional(),
+  logoPath: z.string().optional(),
+  credentialPlaceholder: z.string().optional(),
+  docsUrl: z.url().optional(),
+  modelCount: z.number().int().nonnegative().optional(),
+  modelNames: z.array(z.string()).optional(),
   configured: z.boolean(),
   requiresCredential: z.boolean(),
   enabled: z.boolean(),

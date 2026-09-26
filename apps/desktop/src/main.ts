@@ -154,8 +154,12 @@ function registerIpc(context: { database: AppDatabase; assets: AssetStore; vault
   const providerState = (providerId: string) => {
     const manifest = getProvider(providerId);
     const backend = vault.status();
+    const providerModels = listPublicModels().filter((model) => model.providerId === manifest.id);
     return ProviderStateSchema.parse({
       id: manifest.id, displayName: manifest.displayName,
+      description: manifest.description, logoPath: manifest.logoPath,
+      credentialPlaceholder: manifest.credentialPlaceholder, docsUrl: manifest.docsUrl,
+      modelCount: providerModels.length, modelNames: providerModels.map((model) => model.displayName),
       configured: !manifest.requiresCredential || vault.has(manifest.id),
       requiresCredential: manifest.requiresCredential, enabled: true,
       backend: backend.backend, secure: backend.secure,
@@ -210,9 +214,12 @@ function registerIpc(context: { database: AppDatabase; assets: AssetStore; vault
     let result = { ok: true, message: providerId === 'mock' ? '本地演示引擎可用' : '凭据可用' };
     if (provider.requiresCredential) {
       result = await vault.withSecret(providerId, async (secret) => {
-        const endpoint = providerId === 'openai' ? '/v1/models' : '/api/v1/models';
+        if (!provider.testPath) return { ok: true, message: '密钥已保存；该服务将在首次生成时完成在线验证' };
         try {
-          const response = await fetch(new URL(endpoint, provider.baseUrl), { headers: { Authorization: `Bearer ${secret}` }, signal: AbortSignal.timeout(15_000) });
+          const headers: Record<string, string> = provider.authScheme === 'x-goog-api-key'
+            ? { 'x-goog-api-key': secret }
+            : { Authorization: `${provider.authScheme === 'key' ? 'Key' : 'Bearer'} ${secret}` };
+          const response = await fetch(new URL(provider.testPath, provider.baseUrl), { headers, signal: AbortSignal.timeout(15_000) });
           return response.ok ? { ok: true, message: '连接成功' } : { ok: false, message: `服务返回 ${response.status}` };
         } catch (error) {
           return { ok: false, message: error instanceof Error ? error.message : '连接失败' };

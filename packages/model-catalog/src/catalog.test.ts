@@ -4,7 +4,9 @@ import {
   compatibleNodeKindsForModelType,
   customModelToPublicModel,
   inputTransform,
+  listPublicModels,
   models,
+  providers,
   resolveCustomImageEndpoint,
   resolveCustomModel,
   resolveCustomVideoEndpoint,
@@ -26,6 +28,17 @@ describe('model catalog', () => {
     for (const model of models) for (const endpoint of model.endpoints) {
       expect(() => validateParams(endpoint.params, {})).not.toThrow();
     }
+  });
+
+  it('ships the requested provider families with local logos and public metadata', () => {
+    expect(providers.map((provider) => provider.id)).toEqual(expect.arrayContaining(['minimax', 'xai', 'google', 'volcengine', 'fal']));
+    expect(providers.every((provider) => provider.logoPath.startsWith('./providers/'))).toBe(true);
+    expect(models.map((model) => model.id)).toEqual(expect.arrayContaining([
+      'grok-imagine-image-2.0', 'gemini-3.1-flash-image', 'doubao-seedance-2-5-260628', 'happyhorse-1.0', 'minimax-image-01',
+    ]));
+    expect(listPublicModels().find((model) => model.id === 'gemini-3.1-flash-image')).toMatchObject({
+      providerName: 'Google AI', providerLogoPath: './providers/google.svg',
+    });
   });
 
   it('maps custom model types to the exact compatible canvas nodes', () => {

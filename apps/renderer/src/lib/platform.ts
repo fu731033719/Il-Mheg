@@ -75,7 +75,16 @@ const browserApi: CanvasDesktopApi = {
     test: async () => ({ ok: true, message: '浏览器预览模式' }),
   },
   providers: {
-    list: async () => providers.map((provider) => ({ id: provider.id, displayName: provider.displayName, configured: memory.configuredProviders.has(provider.id), requiresCredential: provider.requiresCredential, enabled: true, backend: 'browser-preview', secure: false })),
+    list: async () => providers.map((provider) => {
+      const providerModels = listPublicModels().filter((model) => model.providerId === provider.id);
+      return {
+        id: provider.id, displayName: provider.displayName, description: provider.description, logoPath: provider.logoPath,
+        credentialPlaceholder: provider.credentialPlaceholder, docsUrl: provider.docsUrl,
+        modelCount: providerModels.length, modelNames: providerModels.map((model) => model.displayName),
+        configured: memory.configuredProviders.has(provider.id), requiresCredential: provider.requiresCredential,
+        enabled: true, backend: 'browser-preview', secure: false,
+      };
+    }),
     putCredential: async ({ providerId }) => { memory.configuredProviders.add(providerId); return { id: providerId, displayName: providers.find((item) => item.id === providerId)?.displayName ?? providerId, configured: true, requiresCredential: true, enabled: true, backend: 'browser-preview', secure: false }; },
     deleteCredential: async (providerId) => { memory.configuredProviders.delete(providerId); },
     test: async () => ({ ok: true, message: '浏览器预览模式' }),

@@ -167,4 +167,34 @@ describe('graph compiler', () => {
     expect(compiled.capability).toBe('image_to_video');
     expect(compiled.inputAssets).toEqual([]);
   });
+
+  it('auto-selects the HappyHorse image-to-video endpoint when a first frame is connected', () => {
+    const graph = createEmptyGraph(crypto.randomUUID());
+    const image = createNode('image', { x: 0, y: 0 });
+    image.output.assetIds = [crypto.randomUUID()];
+    const video = createNode('video', { x: 300, y: 0 });
+    video.config.prompt = 'gentle camera push';
+    video.config.model = { modelId: 'happyhorse-1.0', params: {} };
+    const connected = connectNodes({ ...graph, nodes: [image, video] }, { source: image.id, target: video.id, targetHandle: 'first_frame' });
+
+    const compiled = compileGraphRun(connected, video.id);
+
+    expect(compiled.endpointId).toBe('happyhorse-image-to-video');
+    expect(compiled.endpoint.protocol).toBe('fal-queue');
+  });
+
+  it('auto-selects the HappyHorse reference endpoint for reference images', () => {
+    const graph = createEmptyGraph(crypto.randomUUID());
+    const image = createNode('image', { x: 0, y: 0 });
+    image.output.assetIds = [crypto.randomUUID()];
+    const video = createNode('video', { x: 300, y: 0 });
+    video.config.prompt = 'character1 walking through a market';
+    video.config.model = { modelId: 'happyhorse-1.0', params: {} };
+    const connected = connectNodes({ ...graph, nodes: [image, video] }, { source: image.id, target: video.id, targetHandle: 'reference_image' });
+
+    const compiled = compileGraphRun(connected, video.id);
+
+    expect(compiled.endpointId).toBe('happyhorse-reference-to-video');
+    expect(compiled.inputAssets[0]?.role).toBe('reference');
+  });
 });

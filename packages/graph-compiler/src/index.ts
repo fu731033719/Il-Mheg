@@ -135,7 +135,7 @@ function normalizeLegacyParams(endpoint: EndpointManifest, params: Record<string
   return normalized;
 }
 
-function chooseEndpoint(model: ModelManifest, capability: CapabilityKind, selected?: string) {
+function chooseEndpoint(model: ModelManifest, capability: CapabilityKind, selected?: string, videoMode?: VideoMode) {
   const candidates = model.endpoints.filter((endpoint) => endpoint.capabilities.some((item) => item.kind === capability));
   if (selected) {
     const endpoint = model.endpoints.find((item) => item.id === selected);
@@ -143,8 +143,12 @@ function chooseEndpoint(model: ModelManifest, capability: CapabilityKind, select
     if (!candidates.includes(endpoint)) throw new CompileError('UNSUPPORTED_BINDING', '当前端点不支持画布上的输入，请在右侧切换生成模式');
     return endpoint;
   }
-  if (!candidates[0]) throw new CompileError('UNSUPPORTED_BINDING', '所选模型不支持当前生成模式');
-  return candidates[0];
+  const matching = videoMode
+    ? candidates.find((endpoint) => endpoint.capabilities.some((item) => item.kind === capability && item.videoModes?.includes(videoMode)))
+      ?? candidates.find((endpoint) => endpoint.capabilities.some((item) => item.kind === capability && item.videoModes?.length === 1 && item.videoModes[0] === 'reference'))
+    : candidates[0];
+  if (!matching) throw new CompileError('UNSUPPORTED_BINDING', '所选模型不支持当前生成模式');
+  return matching;
 }
 
 export type ModelResolver = (modelId: string) => ResolvedModelManifest;
@@ -161,7 +165,8 @@ export function compileGraphRun(graph: GraphEnvelope, nodeId: string, resolveMod
   if (model.kind !== node.kind) throw new CompileError('MODEL_DISABLED', '模型类型与节点不匹配');
   let assets = collectInputAssets(graph, node);
   const capability = inferCapability(node, assets);
-  const endpoint = chooseEndpoint(model, capability, selection.endpointId);
+  const videoMode = capability === 'image_to_video' ? inferVideoMode(assets) : undefined;
+  const endpoint = chooseEndpoint(model, capability, selection.endpointId, videoMode);
   if (capability === 'image_to_video') assets = alignVideoAssetsWithEndpoint(assets, endpoint);
   const capabilityConfig = endpoint.capabilities.find((item) => item.kind === capability)!;
   if (assets.length < capabilityConfig.minImages) throw new CompileError('INPUT_MISSING', `至少需要 ${capabilityConfig.minImages} 张输入图片`);
