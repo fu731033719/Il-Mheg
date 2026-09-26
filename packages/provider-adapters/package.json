@@ -1,0 +1,1 @@
+{"name":"@ilmheg/provider-adapters","version":"0.1.0","private":true,"type":"module","exports":"./src/index.ts","dependencies":{"@ilmheg/asset-store":"workspace:*","@ilmheg/graph-compiler":"workspace:*"}}

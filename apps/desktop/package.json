@@ -1,0 +1,6 @@
+{
+  "name": "@ilmheg/desktop",
+  "version": "0.1.0",
+  "private": true,
+  "main": "dist/main.cjs"
+}

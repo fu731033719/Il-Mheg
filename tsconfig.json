@@ -1,0 +1,33 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "allowImportingTsExtensions": false,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "types": ["node", "vite/client"],
+    "baseUrl": ".",
+    "paths": {
+      "@ilmheg/contracts": ["packages/contracts/src/index.ts"],
+      "@ilmheg/domain": ["packages/domain/src/index.ts"],
+      "@ilmheg/model-catalog": ["packages/model-catalog/src/index.ts"],
+      "@ilmheg/graph-compiler": ["packages/graph-compiler/src/index.ts"],
+      "@ilmheg/provider-adapters": ["packages/provider-adapters/src/index.ts"],
+      "@ilmheg/persistence": ["packages/persistence/src/index.ts"],
+      "@ilmheg/credential-vault": ["packages/credential-vault/src/index.ts"],
+      "@ilmheg/asset-store": ["packages/asset-store/src/index.ts"],
+      "@ilmheg/runtime": ["packages/runtime/src/index.ts"],
+      "@renderer/*": ["apps/renderer/src/*"],
+      "@/*": ["apps/renderer/src/*"]
+    }
+  },
+  "include": ["apps/**/*.ts", "apps/**/*.tsx", "packages/**/*.ts", "scripts/**/*.mjs", "vitest.config.ts"]
+}
