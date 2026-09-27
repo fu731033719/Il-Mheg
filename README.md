@@ -181,20 +181,57 @@ Il-Mheg/
 
 ## 本地运行
 
-建议使用 Node.js 24 和 pnpm 10。
+### 环境准备
+
+项目要求 Node.js `>= 20.19.0`，开发时建议使用 Node.js 24 和 pnpm 10。首次拉取仓库后先确认环境并安装锁定依赖：
 
 ```bash
+node --version
+pnpm --version
 pnpm install
+```
+
+启动完整桌面开发环境：
+
+```bash
 pnpm dev
 ```
 
-仅快速检查 Renderer：
+该命令先构建 Electron Main/Preload，再并行启动 `127.0.0.1:5173` 上的 Vite Renderer 和 Electron；任一进程退出后，另一个进程也会被停止。Renderer 修改支持热更新，Main/Preload 修改需要停止命令并重新启动。
+
+只快速检查界面时可以运行：
 
 ```bash
 pnpm dev:renderer
 ```
 
-浏览器预览使用内存适配器，不代表桌面端的 SQLite、凭据、文件和任务恢复能力。要验证完整功能，请运行 Electron。
+浏览器预览在没有 `window.canvasApi` 时使用内存适配器，刷新页面后数据会重置，也不覆盖 IPC、SQLite、凭据、本地素材和任务恢复。涉及这些能力时必须使用 `pnpm dev`。
+
+## 脚本命令速查
+
+以下命令均在仓库根目录执行。
+
+| 命令 | 功能 | 运行方式与产物 |
+| --- | --- | --- |
+| `pnpm dev` | 启动完整 Electron 开发环境 | 先执行 `build:desktop`，再并行运行 Vite 与 Electron；持续运行直到手动停止 |
+| `pnpm dev:renderer` | 启动浏览器版 Renderer | Vite 开发服务器监听 `127.0.0.1:5173`，使用内存适配器并支持热更新 |
+| `pnpm build` | 构建全部生产代码 | 依次执行 `build:renderer` 和 `build:desktop` |
+| `pnpm build:renderer` | 构建 React Renderer | Vite 输出到 `apps/renderer/dist/` |
+| `pnpm build:desktop` | 构建 Electron Main 与 Preload | esbuild 输出 `apps/desktop/dist/main.cjs`、`preload.cjs` 及 source map |
+| `pnpm typecheck` | 检查全仓 TypeScript 类型 | 运行严格模式 `tsc --noEmit`，不产生文件 |
+| `pnpm test` | 运行单元与集成测试一次 | Vitest 在 Node 环境中运行 `apps/`、`packages/` 下的 `*.test.ts` |
+| `pnpm test:watch` | 交互式监听测试 | 文件变化后重跑相关 Vitest 测试，适合开发反馈循环 |
+| `pnpm test:runtime` | 验证真实桌面运行底座 | 构建 `.tmp/runtime-smoke.cjs`，以 Electron Node 运行真实 SQLite、AssetStore、凭据适配和 Runtime smoke；临时数据结束后自动清理 |
+| `pnpm verify` | 执行合并前完整门禁 | 依次执行 `typecheck`、`test`、`build`、`test:runtime`，任一步失败即停止 |
+| `pnpm dist` | 生成未签名桌面安装产物 | 先执行 `verify`，再运行 Electron Builder，产物写入 `release/` |
+
+如需检查 Renderer 的生产构建，可在 `pnpm build:renderer` 后运行：
+
+```bash
+pnpm --filter @ilmheg/renderer preview
+```
+
+该预览仍是浏览器内存模式，访问地址以 Vite 的终端输出为准。
 
 ### 基本使用
 
@@ -206,20 +243,86 @@ pnpm dev:renderer
 
 应用数据写入 Electron 稳定的 `userData` 目录，主要包含 `canvas.db` 和 `assets/`。远程生成结果下载完成后会转为本地素材。
 
-## 验证与打包
+## 开发与调试指南
+
+### 按改动范围选择反馈循环
+
+| 改动范围 | 推荐命令 | 原因 |
+| --- | --- | --- |
+| React 组件、样式、画布交互 | `pnpm dev:renderer` | 启动快且有 Vite 热更新；完成后再用桌面模式验证边界 |
+| Preload、IPC、Electron 窗口或桌面组装 | `pnpm dev` | 需要真实 Main/Preload；修改后必须重启命令 |
+| `domain`、`graph-compiler`、`model-catalog` 等纯逻辑 | `pnpm test:watch` | 优先通过定向单元测试获得快速反馈 |
+| `runtime`、`persistence`、`asset-store`、凭据链路 | `pnpm test:runtime` | 使用 Electron 自带 Node 和真实 SQLite 验证组装链路 |
+| 准备合并 | `pnpm verify` | 一次覆盖类型、测试、生产构建和 Runtime smoke |
+
+### 定向运行测试
+
+Vitest 接受文件路径和测试名过滤参数。例如：
 
 ```bash
-pnpm typecheck      # 全仓严格 TypeScript 检查
-pnpm test           # Vitest 单元/集成测试
-pnpm build          # Renderer + Main/Preload 生产构建
-pnpm test:runtime   # Electron Node + 真实 SQLite/AssetStore/Runtime smoke
-pnpm verify         # 依次执行上述四项
-pnpm dist           # 验证后生成未签名安装产物
+# 只运行一个测试文件
+pnpm test packages/domain/src/domain.test.ts
+
+# 只运行名称匹配的测试
+pnpm test -t "rejects cycles"
+
+# 监听一个 Renderer 工具模块的测试
+pnpm test:watch apps/renderer/src/lib/canvas-navigation.test.ts
+```
+
+全仓 Vitest 默认使用 Node 环境。Renderer 测试目前聚焦可独立运行的状态与交互算法；涉及真实浏览器或桌面窗口的行为仍需手动检查或后续 E2E 覆盖。
+
+### 分层查看日志和状态
+
+- **Renderer**：浏览器模式直接使用浏览器开发者工具；Electron 模式使用 `Cmd+Option+I`（macOS）或 `Ctrl+Shift+I`（Windows/Linux）打开窗口开发者工具。组件异常、网络面板和 Renderer source map 在这里查看。
+- **Main/Preload**：`pnpm dev` 所在终端显示主进程启动异常、未处理错误和构建日志。Preload 暴露面应同时从开发者工具的 `window.canvasApi` 和终端侧 IPC 错误检查。
+- **运行链路**：先确认当前图已保存，再按 GraphCompiler → Runtime → ProviderAdapter → AssetStore/Persistence 的顺序定位。公开 IPC 只返回脱敏 Run，不应依赖 Renderer 获取远程任务 ID 或明文凭据。
+- **产物**：Renderer 产物位于 `apps/renderer/dist/`，Main/Preload 产物位于 `apps/desktop/dist/`，runtime smoke 临时 bundle 位于 `.tmp/`，安装包位于 `release/`。
+
+需要在 Electron Main 启动阶段断点调试时，不要同时运行 `pnpm dev`。分别启动 Renderer 和带 Inspector 的 Electron：
+
+```bash
+# 终端 1
+pnpm dev:renderer
+
+# 终端 2
+pnpm build:desktop
+pnpm exec cross-env VITE_DEV_SERVER_URL=http://127.0.0.1:5173 electron --inspect-brk=9229 .
+```
+
+随后通过 IDE 的 Node attach 配置或 Chromium 的 `chrome://inspect` 连接 `9229`。`--inspect-brk` 会在 Main 启动前暂停；不需要首行暂停时改用 `--inspect=9229`。桌面构建会生成 source map，可直接映射回 TypeScript 源码。
+
+### 本地数据与调试安全
+
+开发版与安装版都把数据写入固定的 `il-mheg-canvas` 用户数据目录：
+
+| 平台 | 默认位置 |
+| --- | --- |
+| macOS | `~/Library/Application Support/il-mheg-canvas/` |
+| Windows | `%APPDATA%\il-mheg-canvas\` |
+| Linux | `$XDG_CONFIG_HOME/il-mheg-canvas/`，未设置时通常为 `~/.config/il-mheg-canvas/` |
+
+其中 `canvas.db` 保存项目图、运行记录、素材元数据和加密后的凭据记录，`assets/` 保存导入及生成的素材。`pnpm dev` 会直接使用这套稳定数据，不是一次性沙箱；调试数据库或迁移前应完全退出应用并备份整个目录，不要在应用运行时直接修改数据库或素材文件。`pnpm test:runtime` 使用独立系统临时目录，不会写入上述开发数据。
+
+### 常见问题排查
+
+- **`pnpm dev` 一直等待或 Electron 加载了错误页面**：确认终端显示 Vite 正在 `127.0.0.1:5173` 监听。根脚本固定等待这个地址；如果端口已被占用，Vite 可能选择其他端口。可先用 `lsof -nP -iTCP:5173 -sTCP:LISTEN`（macOS/Linux）确认占用者，再关闭对应进程并重启。
+- **修改 Main/Preload 后行为没有变化**：根开发脚本不会监听并重建桌面 bundle。停止 `pnpm dev` 后重新运行；仅刷新 Renderer 不会更新 `main.cjs` 或 `preload.cjs`。
+- **浏览器预览无法导入文件、持久化或验证凭据**：这是内存适配器的预期边界。改用 `pnpm dev` 验证 Electron API。
+- **单元测试通过但 SQLite/运行任务失败**：继续运行 `pnpm test:runtime`。该链路必须由 Electron Node 提供 `node:sqlite`；不要用系统 `node` 直接执行 `.tmp/runtime-smoke.cjs`。
+- **Runtime smoke 超时**：先查看终端中具体 Run 状态或异常。smoke 对单个节点设有 15 秒等待上限，并在失败后清理临时目录。
+
+## 验证与打包
+
+日常提交前运行：
+
+```bash
+pnpm verify
 ```
 
 `pnpm test:runtime` 会在临时目录中验证自定义模型 CRUD/凭据关联、真实 SQLite、Mock 文生图、素材回写和异步图生视频链路，完成后清理临时数据。
 
-`pnpm dist` 会先执行全量验证，再调用 Electron Builder。仓库已配置 macOS 的 DMG/ZIP 和 Windows 的 NSIS 目标，具体可生成的未签名产物取决于当前构建平台与工具链。正式发布仍需平台证书、签名、公证和安装升级验收。
+需要安装产物时运行 `pnpm dist`。它会先执行全量验证，再调用 Electron Builder。仓库已配置 macOS 的 DMG/ZIP 和 Windows 的 NSIS 目标，实际可生成的未签名产物取决于当前构建平台与工具链。正式发布仍需平台证书、签名、公证和安装升级验收。
 
 ## 推进路线
 

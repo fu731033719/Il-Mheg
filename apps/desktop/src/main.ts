@@ -27,7 +27,7 @@ import { AssetStore } from '@ilmheg/asset-store';
 import { CredentialVault, type EncryptionAdapter } from '@ilmheg/credential-vault';
 import { customModelProviderId, customModelToPublicModel, listPublicModels, providers, getProvider } from '@ilmheg/model-catalog';
 import { RunOrchestrator } from '@ilmheg/runtime';
-import { APP_DISPLAY_NAME, resolveUserDataPath } from './app-identity';
+import { APP_DISPLAY_NAME, resolveStartupApplicationName, resolveUserDataPath } from './app-identity';
 
 protocol.registerSchemesAsPrivileged([{
   scheme: 'canvas-asset',
@@ -39,7 +39,9 @@ let database: AppDatabase | undefined;
 let orchestrator: RunOrchestrator | undefined;
 
 app.setPath('userData', resolveUserDataPath(app.getPath('appData')));
-app.setName(APP_DISPLAY_NAME);
+// Electron derives the macOS safeStorage Keychain service from the app name during startup.
+// Keep the original internal name until ready so existing encrypted credentials remain readable.
+app.setName(resolveStartupApplicationName(process.platform));
 const singleInstance = app.requestSingleInstanceLock();
 if (!singleInstance) app.quit();
 
@@ -50,6 +52,7 @@ app.on('second-instance', () => {
 });
 
 app.whenReady().then(async () => {
+  app.setName(APP_DISPLAY_NAME);
   if (process.platform === 'darwin') app.dock?.setIcon(resolveAppIconPath());
   const dataRoot = app.getPath('userData');
   mkdirSync(dataRoot, { recursive: true });

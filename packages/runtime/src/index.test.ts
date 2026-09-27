@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { PublicRunRecordSchema } from '@ilmheg/contracts';
 import type { InternalRunRecord } from '@ilmheg/persistence';
-import { toPublicRunRecord } from './index';
+import { toPublicError, toPublicRunRecord } from './index';
 
 describe('toPublicRunRecord', () => {
   it('removes internal snapshots and remote task metadata at the public boundary', () => {
@@ -43,5 +43,15 @@ describe('toPublicRunRecord', () => {
     expect(PublicRunRecordSchema.parse(publicRun)).toEqual(publicRun);
     expect(publicRun).not.toHaveProperty('inputSnapshot');
     expect(publicRun).not.toHaveProperty('remoteTask');
+  });
+});
+
+describe('toPublicError', () => {
+  it('exposes unreadable credentials as an actionable non-retryable error', () => {
+    expect(toPublicError(new Error('CREDENTIAL_UNREADABLE: 请重新保存凭据'))).toEqual({
+      code: 'CREDENTIAL_UNREADABLE',
+      message: '请重新保存凭据',
+      retryable: false,
+    });
   });
 });

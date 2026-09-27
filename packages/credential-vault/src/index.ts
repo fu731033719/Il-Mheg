@@ -36,6 +36,10 @@ export class CredentialVault {
     let secret = '';
     try {
       secret = this.encryption.decryptString(row.value);
+    } catch (cause) {
+      throw new Error('CREDENTIAL_UNREADABLE: 已保存的 API Key 无法解密。请在“应用设置”中重新输入并保存对应凭据后再试。', { cause });
+    }
+    try {
       return await work(secret);
     } finally {
       secret = '';

@@ -235,7 +235,7 @@ export function toPublicRunRecord(run: InternalRunRecord): PublicRunRecord {
   return publicRun;
 }
 
-function toPublicError(error: unknown): PublicRunError {
+export function toPublicError(error: unknown): PublicRunError {
   const message = error instanceof Error ? error.message : String(error);
   if (error instanceof ProviderRequestError) {
     if (error.status === 401 || error.status === 403) return { code: 'CREDENTIAL_REJECTED', message, retryable: true, providerStatus: error.status };
@@ -244,7 +244,7 @@ function toPublicError(error: unknown): PublicRunError {
     return { code: 'PROVIDER_BAD_REQUEST', message, retryable: false, providerStatus: error.status };
   }
   const match = message.match(/^([A-Z_]+):\s*(.*)$/s);
-  const known = new Set(['CREDENTIAL_MISSING', 'CREDENTIAL_REJECTED', 'MODEL_DISABLED', 'GRAPH_REVISION_CONFLICT', 'INPUT_MISSING', 'INPUT_LIMIT_EXCEEDED', 'UNSUPPORTED_BINDING', 'REMOTE_TASK_FAILED', 'REMOTE_TASK_TIMEOUT', 'RESULT_DOWNLOAD_FAILED', 'RESULT_UNSUPPORTED', 'RUN_INTERRUPTED']);
+  const known = new Set(['CREDENTIAL_MISSING', 'CREDENTIAL_REJECTED', 'CREDENTIAL_UNREADABLE', 'MODEL_DISABLED', 'GRAPH_REVISION_CONFLICT', 'INPUT_MISSING', 'INPUT_LIMIT_EXCEEDED', 'UNSUPPORTED_BINDING', 'REMOTE_TASK_FAILED', 'REMOTE_TASK_TIMEOUT', 'RESULT_DOWNLOAD_FAILED', 'RESULT_UNSUPPORTED', 'RUN_INTERRUPTED']);
   const code = match && known.has(match[1]) ? match[1] as PublicRunError['code'] : 'INTERNAL_ERROR';
-  return { code, message: (match?.[2] || message || '未知错误').slice(0, 1000), retryable: !['INPUT_MISSING', 'INPUT_LIMIT_EXCEEDED', 'UNSUPPORTED_BINDING'].includes(code) };
+  return { code, message: (match?.[2] || message || '未知错误').slice(0, 1000), retryable: !['CREDENTIAL_UNREADABLE', 'INPUT_MISSING', 'INPUT_LIMIT_EXCEEDED', 'UNSUPPORTED_BINDING'].includes(code) };
 }

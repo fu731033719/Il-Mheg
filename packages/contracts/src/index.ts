@@ -20,6 +20,7 @@ export const RuntimeStatusSchema = z.enum([
 export const RunErrorCodeSchema = z.enum([
   'CREDENTIAL_MISSING',
   'CREDENTIAL_REJECTED',
+  'CREDENTIAL_UNREADABLE',
   'MODEL_DISABLED',
   'GRAPH_REVISION_CONFLICT',
   'INPUT_MISSING',
