@@ -13,6 +13,9 @@ export const APP_SHORTCUT_GROUPS: readonly ShortcutGroup[] = [
   {
     title: '导航',
     shortcuts: [
+      { keys: ['左键', '拖动'], label: '平移画布', description: '在画布空白处按住左键拖动。' },
+      { keys: ['触摸板', '双指移动'], label: '平移画布', description: '双指横向、纵向或斜向移动，无需按压。' },
+      { keys: ['滚轮 / 触摸板捏合'], label: '缩放画布', description: '以指针或手势位置为中心缩放。' },
       { keys: ['Shift', 'Tab'], label: '切换左侧栏', description: '快速收起或展开项目侧栏。' },
       { keys: ['Space'], label: '适配画布视口', description: '将全部节点重新居中并缩放到可见区域。' },
       { keys: ['Shift', '单击'], label: '多选节点', description: '在当前选择中添加或移除节点。' },

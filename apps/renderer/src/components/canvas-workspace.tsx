@@ -30,6 +30,7 @@ import { MediaViewerDialog, type MediaViewerTarget } from '@/components/media-vi
 import { CanvasNodeCreationMenu, NodeCreationMenu } from '@/components/node-creation-menu';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 import { nodeTypes, type CanvasFlowNode } from '@/components/nodes/canvas-nodes';
+import { useCanvasWheelNavigation } from '@/hooks/use-canvas-wheel-navigation';
 import { useNodeConnectionInteraction } from '@/hooks/use-node-connection-interaction';
 import { applyNodeGeometryChanges } from '@/lib/flow-changes';
 import { canvasNodeFlowSize } from '@/lib/flow-node-layout';
@@ -67,6 +68,7 @@ export function CanvasWorkspace() {
     connect,
     addConnectedNode,
   });
+  useCanvasWheelNavigation(workspaceRef, instance);
 
   const selectNode = useCallback((nodeId: string, additive: boolean) => {
     const current = useCanvasStore.getState().selectedNodeIds;
@@ -208,8 +210,11 @@ export function CanvasWorkspace() {
       defaultViewport={graph.viewport}
       minZoom={0.15}
       maxZoom={2.5}
-      selectionOnDrag
-      panOnDrag={[1, 2]}
+      selectionOnDrag={false}
+      panOnDrag={[0, 1, 2]}
+      panOnScroll
+      zoomOnScroll={false}
+      zoomOnPinch
       nodesConnectable={false}
       multiSelectionKeyCode="Shift"
       deleteKeyCode={null}

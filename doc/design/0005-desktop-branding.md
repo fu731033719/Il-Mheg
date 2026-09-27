@@ -8,7 +8,7 @@
 
 ## 图标资源
 
-`build/icon.png` 是从 `apps/renderer/public/brand/il-mheg-logo.svg` 栅格化并等比居中到透明 1024×1024 画布得到的桌面图标。Renderer 品牌区与 favicon 仍直接引用原始 SVG，因此桌面端和界面内品牌图形来自同一个 LOGO。
+`build/icon.png` 是从 `apps/renderer/public/brand/il-mheg-logo.svg` 栅格化并等比居中到 1024×1024 画布得到的桌面图标。Renderer 品牌区与 favicon 仍直接引用原始 SVG，因此桌面端和界面内品牌图形来自同一个 LOGO。
 
 Electron Builder 的 macOS 与 Windows 配置均显式引用 `build/icon.png`。Builder 在 macOS 产物中由它生成 `icon.icns`；原始 PNG 还通过 `extraResources` 复制为包内 `Resources/icon.png`，供 Electron 主进程设置窗口图标，并在 macOS 上设置 Dock 图标。开发模式直接读取仓库中的 `build/icon.png`。
 
