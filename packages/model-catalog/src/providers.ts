@@ -42,9 +42,9 @@ export const providers: ProviderManifest[] = [
     authScheme: 'key',
   },
   {
-    id: 'dashscope', displayName: '阿里云百炼', description: '通义万相 Wan 系列视频生成。',
+    id: 'dashscope', displayName: '阿里云百炼', description: '北京地域 · Qwen Image、Wan 与 MiniMax H3 图像和视频生成。',
     logoPath: './providers/alibaba-cloud.svg', baseUrl: 'https://dashscope.aliyuncs.com', requiresCredential: true,
-    credentialPlaceholder: 'sk-…', docsUrl: 'https://help.aliyun.com/zh/model-studio/wan-video-generation-api-reference',
+    credentialPlaceholder: '北京地域 API Key（sk-…）', docsUrl: 'https://help.aliyun.com/zh/model-studio/wan3-video-generation-api-reference',
     authScheme: 'bearer', testPath: '/api/v1/models',
   },
 ];

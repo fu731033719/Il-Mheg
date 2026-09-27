@@ -138,7 +138,8 @@ async function download(urlValue: string, maxBytes: number): Promise<Uint8Array>
   const url = new URL(urlValue);
   if (url.protocol !== 'https:') throw new Error('RESULT_DOWNLOAD_FAILED: 只允许下载 HTTPS 媒体');
   await assertPublicHost(url.hostname);
-  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(120_000) });
+  // High-resolution provider outputs can exceed 25 MB; slow OSS downloads may need several minutes.
+  const response = await fetch(url, { redirect: 'error', signal: AbortSignal.timeout(600_000) });
   if (!response.ok) throw new Error(`RESULT_DOWNLOAD_FAILED: 下载失败 (${response.status})`);
   const announced = Number(response.headers.get('content-length') ?? 0);
   if (announced > maxBytes) throw new Error('RESULT_DOWNLOAD_FAILED: 远程文件过大');

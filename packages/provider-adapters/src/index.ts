@@ -2,6 +2,9 @@ import { createHash, randomUUID } from 'node:crypto';
 import path from 'node:path';
 import type { ProviderOutput } from '@ilmheg/asset-store';
 import type { CompiledRun } from '@ilmheg/graph-compiler';
+import { ProviderRequestError, providerError, readJson } from './http';
+import { uploadDashScopeImages } from './dashscope-upload';
+export { ProviderRequestError } from './http';
 
 export interface PreparedInput extends CompiledRun {
   files: Array<{ assetId: string; role: CompiledRun['inputAssets'][number]['role']; order: number; bytes: Uint8Array; mimeType: string; fileName: string; dataUrl: string }>;
@@ -19,13 +22,6 @@ export interface ProviderAdapter {
   readonly protocol: PreparedInput['endpoint']['protocol'];
   submit(input: PreparedInput, secret: string | undefined, signal: AbortSignal): Promise<SubmitOutcome>;
   poll?(input: PreparedInput, taskId: string, attempt: number, secret: string | undefined, signal: AbortSignal): Promise<PollOutcome>;
-}
-
-export class ProviderRequestError extends Error {
-  constructor(public readonly status: number, message: string) {
-    super(message);
-    this.name = 'ProviderRequestError';
-  }
 }
 
 class MockAdapter implements ProviderAdapter {
@@ -419,14 +415,51 @@ class FalQueueAdapter implements ProviderAdapter {
   }
 }
 
+class DashScopeImageAdapter implements ProviderAdapter {
+  readonly protocol = 'dashscope-image' as const;
+
+  async submit(input: PreparedInput, secret: string | undefined, signal: AbortSignal): Promise<SubmitOutcome> {
+    requireSecret(secret, '阿里云百炼');
+    // Only pass fields declared by this endpoint; OpenAI quality/format fields are not compatible.
+    const parameters: Record<string, unknown> = {};
+    for (const field of input.endpoint.params) {
+      if (input.params[field.key] !== undefined) {
+        parameters[field.key === 'count' ? 'n' : field.key] = input.params[field.key];
+      }
+    }
+    const response = await fetch(new URL(input.endpoint.path, input.providerBaseUrl), {
+      method: 'POST', headers: bearerJson(secret), signal,
+      body: JSON.stringify({
+        model: input.upstreamModel,
+        input: { messages: [{ role: 'user', content: [
+          ...input.files.map((file) => ({ image: file.dataUrl })),
+          { text: input.prompt },
+        ] }] },
+        parameters,
+      }),
+    });
+    const payload = await readJson(response);
+    if (!response.ok || payload.code) throw providerError(response.status, payload);
+    const output = payload.output as { choices?: Array<{ message?: { content?: Array<{ image?: unknown }> } }> } | undefined;
+    const outputs: ProviderOutput[] = (output?.choices ?? []).flatMap((choice) =>
+      (choice.message?.content ?? []).flatMap((item): ProviderOutput[] =>
+        typeof item.image === 'string' && item.image ? [{ kind: 'remote_url', url: item.image, mimeType: 'image/png' }] : []),
+    );
+    if (!outputs.length) throw new Error('RESULT_UNSUPPORTED: 百炼响应中没有图片');
+    return { kind: 'completed', outputs };
+  }
+}
+
 class DashScopeVideoAdapter implements ProviderAdapter {
   readonly protocol = 'dashscope-video' as const;
 
   async submit(input: PreparedInput, secret: string | undefined, signal: AbortSignal): Promise<SubmitOutcome> {
     if (!secret) throw new Error('CREDENTIAL_MISSING: 尚未配置 DashScope API Key');
-    const media = input.files.map((file) => ({
-      type: dashScopeMediaType(file.role),
-      url: file.dataUrl,
+    const upload = input.endpoint.mediaTransport === 'dashscope-oss' && input.files.length > 0;
+    const urls = upload ? await uploadDashScopeImages(input, secret, signal) : input.files.map((file) => file.dataUrl);
+    const media = input.files.map((file, index) => ({
+      type: file.role === 'reference' ? input.endpoint.referenceImageType ?? 'reference_image' : dashScopeMediaType(file.role),
+      url: urls[index],
     }));
     const response = await fetch(new URL(input.endpoint.path, input.providerBaseUrl), {
       method: 'POST',
@@ -434,6 +467,7 @@ class DashScopeVideoAdapter implements ProviderAdapter {
         Authorization: `Bearer ${secret}`,
         'Content-Type': 'application/json',
         'X-DashScope-Async': 'enable',
+        ...(upload ? { 'X-DashScope-OssResourceResolve': 'enable' } : {}),
       },
       body: JSON.stringify({
         model: input.upstreamModel,
@@ -444,6 +478,7 @@ class DashScopeVideoAdapter implements ProviderAdapter {
           duration: input.params.duration,
           prompt_extend: input.params.prompt_extend,
           watermark: input.params.watermark,
+          ...(input.params.audio !== undefined ? { audio: input.params.audio } : {}),
         },
       }),
       signal,
@@ -491,6 +526,7 @@ export const adapters: ProviderAdapter[] = [
   new MiniMaxVideoAdapter(),
   new ArkVideoAdapter(),
   new FalQueueAdapter(),
+  new DashScopeImageAdapter(),
   new DashScopeVideoAdapter(),
 ];
 
@@ -539,8 +575,6 @@ function setFormParam(form: FormData, key: string, value: unknown) { if (value !
 function outputMime(format: string) { return format === 'jpeg' ? 'image/jpeg' : format === 'webp' ? 'image/webp' : 'image/png'; }
 function isAliyunMaas(baseUrl: string) { const hostname = new URL(baseUrl).hostname; return hostname === 'maas.aliyuncs.com' || hostname.endsWith('.maas.aliyuncs.com'); }
 function delay(ms: number, signal: AbortSignal) { return new Promise<void>((resolve, reject) => { const timer = setTimeout(resolve, ms); signal.addEventListener('abort', () => { clearTimeout(timer); reject(signal.reason ?? new DOMException('Aborted', 'AbortError')); }, { once: true }); }); }
-async function readJson(response: Response): Promise<Record<string, unknown>> { const text = await response.text(); try { return JSON.parse(text) as Record<string, unknown>; } catch { return { message: text.slice(0, 1000) }; } }
-function providerError(status: number, payload: Record<string, unknown>) { const nested = payload.error && typeof payload.error === 'object' ? payload.error as Record<string, unknown> : payload; return new ProviderRequestError(status, String(nested.message ?? payload.message ?? `Provider 请求失败 (${status})`).slice(0, 1000)); }
 
 function requireSecret(secret: string | undefined, provider: string): asserts secret is string {
   if (!secret) throw new Error(`CREDENTIAL_MISSING: 尚未配置 ${provider} API Key`);

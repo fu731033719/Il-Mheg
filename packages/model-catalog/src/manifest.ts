@@ -5,6 +5,7 @@ export type VideoMode = 'text' | 'first_frame' | 'first_last' | 'reference';
 export type ProviderProtocol =
   | 'mock'
   | 'openai-image'
+  | 'dashscope-image'
   | 'dashscope-video'
   | 'xai-image'
   | 'xai-video'
@@ -33,6 +34,8 @@ export interface EndpointManifest {
   capabilities: CapabilityManifest[];
   params: ParamField[];
   pollPath?: string;
+  mediaTransport?: 'data-url' | 'dashscope-oss';
+  referenceImageType?: 'reference_image' | 'image_url';
 }
 
 export interface ModelManifest {

@@ -1,4 +1,5 @@
 import type { ParamField } from '@ilmheg/contracts';
+import { bailianQualityModels } from './bailian';
 import type { CapabilityManifest, EndpointManifest, ModelManifest, VideoMode } from './manifest';
 import {
   createVideoParams,
@@ -203,6 +204,8 @@ export const models: ModelManifest[] = [
       },
     ],
   },
+
+  ...bailianQualityModels,
 
   {
     id: 'wan2.7-i2v', providerId: 'dashscope', displayName: 'Wan 2.7 图生视频', kind: 'video', upstreamModel: 'wan2.7-i2v-2026-04-25',
