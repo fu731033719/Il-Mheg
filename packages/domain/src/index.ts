@@ -9,6 +9,8 @@ import {
   type InputBinding,
 } from '@ilmheg/contracts';
 
+export type InputBindingKind = InputBinding['kind'];
+
 export class DomainError extends Error {
   constructor(public readonly code: string, message: string) {
     super(message);
@@ -64,15 +66,29 @@ export function createNode<K extends CanvasNodeKind>(kind: K, position: { x: num
   return CanvasNodeSchema.parse(nodes[kind]) as Extract<CanvasNode, { kind: K }>;
 }
 
-export function bindingLabel(binding: InputBinding): string {
-  switch (binding.kind) {
+export function bindingKindLabel(kind: InputBindingKind): string {
+  switch (kind) {
     case 'prompt': return '提示词';
-    case 'source_image': return `源图片 ${binding.index + 1}`;
+    case 'source_image': return '源图片';
     case 'first_frame': return '首帧';
     case 'last_frame': return '尾帧';
-    case 'reference_image': return `参考图 ${binding.index + 1}`;
-    case 'source_video': return `视频 ${binding.index + 1}`;
+    case 'reference_image': return '参考图';
+    case 'source_video': return '视频';
   }
+}
+
+export function bindingLabel(binding: InputBinding): string {
+  const label = bindingKindLabel(binding.kind);
+  return 'index' in binding ? `${label} ${binding.index + 1}` : label;
+}
+
+export function bindingKindsForConnection(source: CanvasNode, target: CanvasNode): readonly InputBindingKind[] {
+  if (source.kind === 'group' || target.kind === 'group') return [];
+  if (source.kind === 'prompt' && (target.kind === 'image' || target.kind === 'video')) return ['prompt'];
+  if (source.kind === 'image' && target.kind === 'image') return ['source_image'];
+  if (source.kind === 'image' && target.kind === 'video') return ['first_frame', 'last_frame', 'reference_image'];
+  if (source.kind === 'video' && target.kind === 'video') return ['source_video'];
+  return [];
 }
 
 function nextIndex(edges: CanvasEdge[], target: string, kind: 'source_image' | 'reference_image' | 'source_video') {
@@ -107,6 +123,44 @@ export function inferBinding(
     return { kind: 'source_video', index: nextIndex(edges, target.id, 'source_video') };
   }
   throw new DomainError('INCOMPATIBLE_NODES', `不支持 ${source.kind} → ${target.kind} 连线`);
+}
+
+export function updateEdgeBinding(
+  graph: GraphEnvelope,
+  edgeId: string,
+  requestedKind: InputBindingKind,
+): GraphEnvelope {
+  const edge = graph.edges.find((item) => item.id === edgeId);
+  if (!edge) throw new DomainError('EDGE_NOT_FOUND', '引用源连线不存在');
+  const source = graph.nodes.find((node) => node.id === edge.source);
+  const target = graph.nodes.find((node) => node.id === edge.target);
+  if (!source || !target) throw new DomainError('NODE_NOT_FOUND', '引用源节点不存在');
+
+  const allowedKinds = bindingKindsForConnection(source, target);
+  if (!allowedKinds.includes(requestedKind)) {
+    throw new DomainError('INCOMPATIBLE_BINDING', `不支持把 ${source.kind} → ${target.kind} 设置为${bindingKindLabel(requestedKind)}`);
+  }
+  if (edge.binding.kind === requestedKind) return graph;
+
+  const displaced = graph.edges.find((item) =>
+    item.id !== edge.id
+    && item.target === edge.target
+    && item.binding.kind === requestedKind
+    && !('index' in item.binding));
+  const requestedBinding = createBinding(requestedKind, graph.edges, edge.target);
+  const edges = graph.edges.map((item) => {
+    if (item.id === edge.id) return { ...item, binding: requestedBinding } as CanvasEdge;
+    if (item.id !== displaced?.id) return item;
+    return { ...item, binding: createBinding(edge.binding.kind, graph.edges, edge.target) } as CanvasEdge;
+  });
+  return validateGraph({ ...graph, edges: normalizeBindingIndices(edges) });
+}
+
+function createBinding(kind: InputBindingKind, edges: CanvasEdge[], target: string): InputBinding {
+  if (kind === 'source_image' || kind === 'reference_image' || kind === 'source_video') {
+    return { kind, index: nextIndex(edges, target, kind) };
+  }
+  return { kind };
 }
 
 export function wouldCreateCycle(nodes: CanvasNode[], edges: CanvasEdge[], source: string, target: string): boolean {

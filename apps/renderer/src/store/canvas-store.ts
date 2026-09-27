@@ -10,6 +10,7 @@ import type {
   PublicAsset,
   PublicModel,
   PublicRunRecord,
+  InputBinding,
 } from '@ilmheg/contracts';
 import {
   autoLayout,
@@ -17,6 +18,7 @@ import {
   connectNodes,
   createNode,
   removeNodes,
+  updateEdgeBinding,
 } from '@ilmheg/domain';
 import { connectionForDrop, type ConnectionSide } from '@/lib/node-connections';
 import { AsyncGate } from '@/lib/async-gate';
@@ -59,6 +61,7 @@ interface CanvasState {
   copySelected(): void;
   paste(): void;
   connect(source: string, target: string, targetHandle?: string | null): void;
+  setEdgeBinding(edgeId: string, kind: InputBinding['kind']): void;
   removeEdge(edgeId: string): void;
   layout(): void;
   groupSelected(): void;
@@ -229,6 +232,7 @@ export const useCanvasStore = create<CanvasState>((set, get) => ({
   paste: () => { if (get().clipboardNodeIds.length) get().commit((graph) => cloneNodes(graph, get().clipboardNodeIds, { x: 72, y: 72 })); },
 
   connect: (source, target, targetHandle) => get().commit((graph) => connectNodes(graph, { source, target, targetHandle })),
+  setEdgeBinding: (edgeId, kind) => get().commit((graph) => updateEdgeBinding(graph, edgeId, kind)),
   removeEdge: (edgeId) => {
     get().commit((graph) => ({ ...graph, edges: graph.edges.filter((edge) => edge.id !== edgeId) }));
     set({ selectedEdgeId: undefined });

@@ -126,6 +126,21 @@ describe('canvas store save-before-run', () => {
     });
   });
 
+  it('updates a reference source binding through the undoable graph history', async () => {
+    await useCanvasStore.getState().createProject();
+    useCanvasStore.getState().addNode('image');
+    useCanvasStore.getState().addNode('video');
+    const [image, video] = useCanvasStore.getState().graph!.nodes;
+    useCanvasStore.getState().connect(image!.id, video!.id);
+    const edge = useCanvasStore.getState().graph!.edges[0]!;
+    const historyLength = useCanvasStore.getState().past.length;
+
+    useCanvasStore.getState().setEdgeBinding(edge.id, 'reference_image');
+
+    expect(useCanvasStore.getState().graph!.edges[0]!.binding).toEqual({ kind: 'reference_image', index: 0 });
+    expect(useCanvasStore.getState().past).toHaveLength(historyLength + 1);
+  });
+
   it('reveals resources for the requested project without switching projects', async () => {
     const currentProjectId = useCanvasStore.getState().currentProjectId!;
     const target = await mock.api.projects.create({ name: '资源项目' });

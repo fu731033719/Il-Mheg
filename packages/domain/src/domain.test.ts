@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { connectNodes, createEmptyGraph, createNode, normalizeBindingIndices } from './index';
+import { bindingKindsForConnection, connectNodes, createEmptyGraph, createNode, normalizeBindingIndices, updateEdgeBinding } from './index';
 
 describe('graph invariants', () => {
   it('creates an explicit prompt binding', () => {
@@ -40,5 +40,57 @@ describe('graph invariants', () => {
       { kind: 'first_frame' },
       { kind: 'last_frame' },
     ]);
+  });
+
+  it('offers every video image reference role through one connection', () => {
+    const image = createNode('image', { x: 0, y: 0 });
+    const video = createNode('video', { x: 300, y: 0 });
+
+    expect(bindingKindsForConnection(image, video)).toEqual(['first_frame', 'last_frame', 'reference_image']);
+  });
+
+  it('updates a video image reference role and normalizes reference indices', () => {
+    const graph = createEmptyGraph(crypto.randomUUID());
+    const first = createNode('image', { x: 0, y: 0 });
+    const last = createNode('image', { x: 0, y: 200 });
+    const reference = createNode('image', { x: 0, y: 400 });
+    const video = createNode('video', { x: 400, y: 0 });
+    const withFirst = connectNodes({ ...graph, nodes: [first, last, reference, video] }, { source: first.id, target: video.id });
+    const withLast = connectNodes(withFirst, { source: last.id, target: video.id });
+    const connected = connectNodes(withLast, { source: reference.id, target: video.id });
+    const referenceEdge = connected.edges.find((edge) => edge.source === reference.id)!;
+
+    const updated = updateEdgeBinding(connected, referenceEdge.id, 'first_frame');
+
+    expect(updated.edges.map((edge) => edge.binding)).toEqual([
+      { kind: 'reference_image', index: 0 },
+      { kind: 'last_frame' },
+      { kind: 'first_frame' },
+    ]);
+  });
+
+  it('swaps occupied first and last frame roles', () => {
+    const graph = createEmptyGraph(crypto.randomUUID());
+    const first = createNode('image', { x: 0, y: 0 });
+    const last = createNode('image', { x: 0, y: 200 });
+    const video = createNode('video', { x: 400, y: 0 });
+    const withFirst = connectNodes({ ...graph, nodes: [first, last, video] }, { source: first.id, target: video.id });
+    const connected = connectNodes(withFirst, { source: last.id, target: video.id });
+
+    const updated = updateEdgeBinding(connected, connected.edges[0]!.id, 'last_frame');
+
+    expect(updated.edges.map((edge) => edge.binding)).toEqual([
+      { kind: 'last_frame' },
+      { kind: 'first_frame' },
+    ]);
+  });
+
+  it('rejects a reference role that is incompatible with the connected node kinds', () => {
+    const graph = createEmptyGraph(crypto.randomUUID());
+    const source = createNode('image', { x: 0, y: 0 });
+    const target = createNode('image', { x: 300, y: 0 });
+    const connected = connectNodes({ ...graph, nodes: [source, target] }, { source: source.id, target: target.id });
+
+    expect(() => updateEdgeBinding(connected, connected.edges[0]!.id, 'first_frame')).toThrow(/不支持/);
   });
 });

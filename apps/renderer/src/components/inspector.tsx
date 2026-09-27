@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AlertCircle, ChevronRight, Clapperboard, GripHorizontal, Image as ImageIcon, ImagePlus, MessageSquareText, Play, RotateCcw, Settings2, Square, Trash2, WandSparkles } from 'lucide-react';
 import type { CanvasNode, InputBinding, PublicAsset, PublicModel } from '@ilmheg/contracts';
-import { bindingLabel } from '@ilmheg/domain';
+import { bindingKindLabel, bindingKindsForConnection, bindingLabel, type InputBindingKind } from '@ilmheg/domain';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -45,6 +45,7 @@ function NodeInspector({ node }: { node: CanvasNode }) {
   const runs = useCanvasStore((state) => state.runs);
   const select = useCanvasStore((state) => state.select);
   const patchNode = useCanvasStore((state) => state.patchNode);
+  const setEdgeBinding = useCanvasStore((state) => state.setEdgeBinding);
   const importAsset = useCanvasStore((state) => state.importAsset);
   const startRun = useCanvasStore((state) => state.startRun);
   const cancelRun = useCanvasStore((state) => state.cancelRun);
@@ -116,13 +117,15 @@ function NodeInspector({ node }: { node: CanvasNode }) {
     {node.kind === 'image' || node.kind === 'video' ? <>
       <Separator />
       <section className="space-y-2.5">
-        <div className="flex items-center justify-between"><Label>输入素材</Label><Badge>{incoming.length}</Badge></div>
+        <div className="flex items-center justify-between"><Label>引用源</Label><Badge>{incoming.length}</Badge></div>
         {node.kind === 'image' ? <Button variant="outline" className="w-full justify-start" onClick={() => void importAsset(node.id)}><ImagePlus className="mr-2 h-4 w-4" />{node.config.sourceAssetId ? '替换本地图片' : '导入本地图片'}</Button> : null}
         {incoming.length ? <div className="space-y-1.5">{incoming.map(({ edge, source, asset }) => <NodeReference
           key={edge.id}
           node={source}
           binding={edge.binding}
           asset={asset}
+          bindingKinds={bindingKindsForConnection(source, node)}
+          onBindingChange={(kind) => setEdgeBinding(edge.id, kind)}
           onSelect={() => select([source.id])}
         />)}</div> : <p className="rounded-lg border border-dashed border-border p-3 text-center text-[11px] leading-5 text-muted-foreground">靠近节点卡片边缘并点击“+”创建连接节点，或按住拖向另一张卡片。</p>}
       </section>
@@ -132,26 +135,37 @@ function NodeInspector({ node }: { node: CanvasNode }) {
   </div>;
 }
 
-function NodeReference({ node, binding, asset, onSelect }: {
+function NodeReference({ node, binding, asset, bindingKinds, onBindingChange, onSelect }: {
   node: CanvasNode;
   binding: InputBinding;
   asset?: PublicAsset;
+  bindingKinds: readonly InputBindingKind[];
+  onBindingChange(kind: InputBindingKind): void;
   onSelect(): void;
 }) {
-  return <button
-    type="button"
-    className="group flex w-full items-center gap-2.5 rounded-lg border border-border bg-muted/30 p-1.5 text-left transition-colors hover:border-foreground/20 hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
-    onClick={onSelect}
-    aria-label={`选择引用节点“${node.title}”`}
-    title={`切换到“${node.title}”`}
-  >
-    <NodeReferenceThumbnail node={node} asset={asset} />
-    <span className="min-w-0 flex-1">
-      <span className="block text-[10px] leading-4 text-muted-foreground">{bindingLabel(binding)}</span>
-      <span className="block truncate text-xs font-medium text-foreground">{node.title}</span>
-    </span>
-    <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
-  </button>;
+  return <div className="rounded-lg border border-border bg-muted/30 p-1.5 transition-colors hover:border-foreground/20 hover:bg-accent">
+    <button
+      type="button"
+      className="group flex w-full items-center gap-2.5 rounded-md text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1"
+      onClick={onSelect}
+      aria-label={`选择引用节点“${node.title}”`}
+      title={`切换到“${node.title}”`}
+    >
+      <NodeReferenceThumbnail node={node} asset={asset} />
+      <span className="min-w-0 flex-1">
+        <span className="block text-[10px] leading-4 text-muted-foreground">{bindingLabel(binding)}</span>
+        <span className="block truncate text-xs font-medium text-foreground">{node.title}</span>
+      </span>
+      <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" aria-hidden="true" />
+    </button>
+    {bindingKinds.length > 1 ? <div className="mt-1.5 flex items-center gap-2 border-t border-border/70 pt-1.5 pl-[52px]">
+      <span className="shrink-0 text-[10px] text-muted-foreground">用途</span>
+      <Select value={binding.kind} onValueChange={(value) => onBindingChange(value as InputBindingKind)}>
+        <SelectTrigger className="h-7 flex-1 px-2 text-xs" aria-label={`设置“${node.title}”的引用用途`}><SelectValue /></SelectTrigger>
+        <SelectContent>{bindingKinds.map((kind) => <SelectItem key={kind} value={kind}>{bindingKindLabel(kind)}</SelectItem>)}</SelectContent>
+      </Select>
+    </div> : null}
+  </div>;
 }
 
 function NodeReferenceThumbnail({ node, asset }: { node: CanvasNode; asset?: PublicAsset }) {
